@@ -1,37 +1,65 @@
 // OS Startup code for XOS
 
-load (7, 1); 					// Load exception handler
+load (7, 1); 			// Load exception handler
 load (8, 2);
 
-load (9, 3);					//Load timer handler
+load (9, 3);			//Load timer handler
 load (10, 4);
 
-load (11, 5);					// Load Interrupt routine 1
+load (11, 5);			// Load Interrupt routine 1
 load (12, 6);
 
-load (23, 17);					// Load Interrupt routine7
+load (23, 17);			// Load Interrupt routine7
 load (24, 18);
 
-[READY_LIST + 0] = 0; 			// Sets the entry for PID as 0 
+[READY_LIST + 0] = 0; 		// Sets the entry for PID as 0 
 
-load(25,21); 					// Load pages of code from disk to memory
+load(25,21); 			// Load pages of code from disk to memory
 load(26,22); 
 load(27,23); 
 
-PTBR = 1024; 					// PTBR = 1024 + (PID x 8) 
-PTLR = 4;						// Limit for every process 4
+PTBR = 1024; 			// PTBR = 1024 + (PID x 8) 
+PTLR = 4;			// Limit for every process 4
 
 [PTBR + 0] = 25; 	// Physical Page Number for Logical Page 0
 [PTBR + 1] = "01"; 	// Not referenced and valid
-[PTBR + 2] = 26; 	// 			"							 1
-[PTBR + 3] = "01"; 	// 			"
-[PTBR + 4] = 27; 	//			"							 2
-[PTBR + 5] = "01"; 	// 			"
-[PTBR + 6] = 28; 	// 			"							 3
-[PTBR + 7] = "01"; 	// 			"
+[PTBR + 2] = 26; 	// 		"			 1
+[PTBR + 3] = "01"; 	// 		"
+[PTBR + 4] = 27; 	//		"			 2
+[PTBR + 5] = "01"; 	// 		"
+[PTBR + 6] = 28; 	// 		"			 3
+[PTBR + 7] = "01"; 	// 		"
 
-[READY_LIST + 0] = 2;			// Sets the entry for STATE as Running 
-SP = 3 * 512; 					
-[28 * 512] = 0; 				// Set up the IP value for INIT in the stack 
-								// on ireturn, IP is popped from SP 
+[READY_LIST + 0] = 2;		// Sets the entry for STATE as Running 
+SP = 3 * 512; 			
+[28 * 512] = 0; 		// Set up the IP value for INIT in the stack 
+				// on ireturn, IP is popped from SP 
+
+//////////////////////////////////////////////////////////////////
+//                Multi Programming Starts			//
+//////////////////////////////////////////////////////////////////
+
+[READY_LIST + 32] = 1; 		// Sets the entry for PID as 1
+
+load (29, 25);			// Load User process1 block
+
+alias PTBR_Process1 S0;			
+PTBR_Process1 = 1024 + 1 * 8; 	// Made to point the pagetable of process 1
+
+[PTBR_Process1 + 0] = 29; 	// Physical Page Number for Logical Page 0
+[PTBR_Process1 + 1] = "01"; 	// Not referenced and Valid
+[PTBR_Process1 + 2] = -1; 	// Invalid Page Number for Logical Page 1
+[PTBR_Process1 + 3] = "00"; 	// Not referenced and Not Valid
+[PTBR_Process1 + 4] = -1; 	// Invalid Page Number for Logical Page 1
+[PTBR_Process1 + 5] = "00"; 	// Not referenced and Not Valid
+[PTBR_Process1 + 6] = 30; 	// Physical Page Number for Logical Page 3
+[PTBR_Process1 + 7] = "01"; 	// Not referenced and Valid
+
+[READY_LIST + 33] = 1; 			// STATE is READY 
+[READY_LIST + 37] = PTBR_Process1; 	// PTBR 
+[READY_LIST + 38] = 4; 			// PTLR 
+[READY_LIST + 34] = 3 * 512; 		// Sets the entry for BP in the PCB
+[READY_LIST + 35] = 3 * 512; 		// Sets the entry for SP in the PCB
+[READY_LIST + 36] = 0; 			// Sets the entry for IP to logical address 0 in the PCB 
+
 ireturn; 
