@@ -3,7 +3,10 @@
 load (7, 1); 					// Load exception handler
 load (8, 2);
 
-load (23, 17);					// Load INT 7
+load (11, 5);					// Load Interrupt routine 1
+load (12, 6);
+
+load (23, 17);					// Load Interrupt routine7
 load (24, 18);
 
 [READY_LIST + 0] = 0; 			// Sets the entry for PID as 0 
