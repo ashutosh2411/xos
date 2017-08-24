@@ -3,6 +3,9 @@
 load (7, 1); 					// Load exception handler
 load (8, 2);
 
+load (9, 3);					//Load timer handler
+load (10, 4);
+
 load (11, 5);					// Load Interrupt routine 1
 load (12, 6);
 
