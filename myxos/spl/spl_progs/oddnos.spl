@@ -11,5 +11,3 @@ while(counter <= n) do
 	endif;
 	counter = counter + 1;
 endwhile; 
-
-

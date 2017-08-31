@@ -1,4 +1,6 @@
 // OS Startup code for XOS
+load (5, 19);			// Load File Allocation Table
+load (6, 20);			// Load Disk Free List
 
 load (7, 1); 			// Load exception handler
 load (8, 2);
