@@ -63,5 +63,5 @@ PTBR_Process1 = 1024 + 1 * 8; 	// Made to point the pagetable of process 1
 [READY_LIST + 34] = 3 * 512; 		// Sets the entry for BP in the PCB
 [READY_LIST + 35] = 3 * 512; 		// Sets the entry for SP in the PCB
 [READY_LIST + 36] = 0; 			// Sets the entry for IP to logical address 0 in the PCB 
-
+//print ("exit startup");
 ireturn; 

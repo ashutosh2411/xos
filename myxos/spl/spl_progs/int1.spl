@@ -1,3 +1,4 @@
+//print("Entered interrupt");								
 
 alias physicalSP S0;				// Physical Address = Physical Page Number x 512 + offset.
 physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
@@ -6,37 +7,38 @@ physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
 alias sysCallNo S1;					// First argument from stack is system call number.
 sysCallNo = [physicalSP - 1];
 
-//returnvalue = [physicalSP - 2]	// [physicalSP - 2] is for return value to be saved in stack.
+// returnvalue = [physicalSP - 2]	// [physicalSP - 2] is for return value to be saved in stack.
 
 alias filename S2;					// The Next argument is file name.
 filename = [physicalSP - 3];		// There is just one argument for this system call.
-									
+
 if (sysCallNo == 1) then			// sysCallNo = 1 => Create file.
-	
+	//print("Syscallno = 1");
 	alias FATIndex S3;				// To index in FAT table.
 	FATIndex = 0;
 	
 	while (FATIndex < 64) do		// See if file is already present.
-									// Each entry is 8 words.
+		//print("Here");							// Each entry is 8 words.
 		if ([FAT + FATIndex*8] == filename) then
 			[physicalSP - 2] = 0;	// Return success.
 			ireturn;
 		endif;
+		FATIndex = FATIndex + 1;
 	endwhile;
 	
 	alias DFLIndex S4;				// To index in Disk Free List.
-	DFLIndex = 0;
+	DFLIndex = 24;
 	
-	while (DFLIndex < 477) do		// 477-512 are to be used for swapping. 
+	while (DFLIndex < 448) do		// 447-512 are to be used for swapping. 
 									// Find a free slot in DFL. 
-									// Each entry is 1 word
+		//print("Here");							// Each entry is 1 word
 		if ([FAT + 512 + DFLIndex] == 0) then	
 			break;					// FAT + 512 = address where DFL starts.
 		endif;				
 		DFLIndex = DFLIndex + 1;	
 	endwhile;
 	
-	if (DFLIndex == 477) then		// If no slot in the disk is free, return error.
+	if (DFLIndex == 448) then		// If no slot in the disk is free, return error.
 		[physicalSP - 2] = -1;
 		ireturn;
 	endif;
@@ -45,6 +47,10 @@ if (sysCallNo == 1) then			// sysCallNo = 1 => Create file.
 	FATIndex = 0;
 	while (FATIndex < 64) do		// Find a free slot in FAT.
 		if ([FAT + FATIndex * 8 + 2] == -1) then
+			// Initialization of the FAT entry		// FATIndex stores the index of free FAT slot.
+			[FAT + FATIndex * 8] = filename;  		// Setting file entry.
+			[FAT + FATIndex * 8 + 1] = 0;			// File size.
+			[FAT + FATIndex * 8 + 2] = DFLIndex;	// Basic Block Number.
 			break;		
 		endif;		
 		FATIndex = FATIndex + 1;	
@@ -54,11 +60,6 @@ if (sysCallNo == 1) then			// sysCallNo = 1 => Create file.
 		[physicalSP - 2] = -1;
 		ireturn;
 	endif;
-	
-	// Initialization of the FAT entry			// FATIndex stores the index of free FAT slot.
-	[FAT + FATIndex * 8] = filename;  			// Setting file entry.
-	[FAT + FATIndex * 8 + 1] = 0;				// File size.
-	[FAT + FATIndex * 8 + 2] = DFLIndex;		// Basic Block Number.
 
 	load (1, DFLIndex);							// Load the basic block to OS startup code page
 												// as that page is no longer required.
@@ -76,7 +77,7 @@ if (sysCallNo == 1) then			// sysCallNo = 1 => Create file.
 
 	store(5, 19);						// store the updated FAT to disk 			
 	store(6, 20);						// store the updated DFL to disk
-
+	
 	[physicalSP - 2] = 0;				// return without an error
 	ireturn;
 	
