@@ -1,0 +1,85 @@
+alias physicalSP S0;				// Physical Address = Physical Page Number x 512 + offset.
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+
+
+alias sysCallNo S1;					// First argument from stack is system call number.
+sysCallNo = [physicalSP - 1];
+
+// returnvalue = [physicalSP - 2]	// [physicalSP - 2] is for return value to be saved in stack.
+
+alias currPCB S6;					// Formula for curr PCB
+currPCB = READY_LIST = 32 * ((PTBR - 1024) / 8);
+
+if (sysCallNo == 2) then 
+	
+	alias filename S2;					// The Next argument is file name.
+	filename = [physicalSP - 3];		// There is just one argument for this system call.
+
+	alias FATIndex S3;					// To index in FAT table.
+	FATIndex = 0;
+
+	while (FATIndex < 64) do			// See if file is already present.	
+		if ([FAT + FATIndex*8] == filename) then
+			break;
+		endif;
+
+		FATIndex = FATIndex + 1;
+	endwhile;
+
+	if (FATIndex == 64)	then
+		[physicalSP - 2] = -1;
+		ireturn;
+	endif;								// FATIndex stores free FAT entry
+
+	alias SOFTIndex S4;
+	SOFTIndex = 0;
+
+	while (SOFTIndex < 64) do 			// Check System Wide OpenFile Table
+		if ([SOFTIndex*2+FILE_TABLE] == FATIndex) then
+			break;						// if already opened
+		endif;
+		SOFTIndex = SOFTIndex +1;		// SOFTIndex stores corresponding value
+	endwhile;
+
+	if (SOFTIndex>=64) then				// Look for a free slot
+		SOFTIndex = 0;
+
+		while(SOFTIndex < 64) do 		// Free Slot found
+			if([FILE_TABLE+SOFTIndex*2] == -1) then
+				break;					// Break
+			endif;						// SOFTIndex stores the corresponding value
+
+			SOFTIndex = SOFTIndex+1;
+		endwhile;
+		
+		if (SWOFTIndex >= 64) then		// no free slot found
+			[physicalSP - 2] = -1;		// return errorcode
+			ireturn;
+		endif;
+		
+		[SWOFTIndex * 2 + 1] = 0;		// setting initial file count to 0
+	endif;
+
+	aliad POFTIndex S5;
+	POFTIndex = 0;
+
+	while (POFTIndex < 8) do 
+		if ([currPCB + 15 + POFTIndex * 2] == -1) then
+			break;
+		endif;
+
+		POFTIndex = POFTIndex + 1;
+	endwhile;
+
+	if(POFTIndex==8) then
+		[physicalSP-2] = -1;
+		ireturn;
+	endif;
+
+	[currPCB+15+POFTIndex*2]   = SOFTIndex;
+	[currPCB+15+POFTIndex*2+1] = 0;
+	[physicalSP-2] = POFTIndex;
+	ireturn;
+endif;
+
+
