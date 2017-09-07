@@ -1,4 +1,4 @@
-//print("Entered interrupt");								
+// int=1 handles SysCall 1 and 4					
 
 alias physicalSP S0;				// Physical Address = Physical Page Number x 512 + offset.
 physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
@@ -83,6 +83,55 @@ if (sysCallNo == 1) then			// sysCallNo = 1 => Create file.
 	
 endif;
 
-if (sysCallNo == 4) then
-	[physicalSP - 2] = -1;
+if (sysCallNo == 4) then				// sysCallNo = 4 => Delete file.
+	alias FATIndex S3;				// To index in FAT table.
+	FATIndex = 0;
+	
+	while (FATIndex < 64) do						// See if file is already present.
+		if ([FAT + FATIndex*8] == filename) then	// Each entry is 8 words.
+			break;
+		endif;
+		FATIndex = FatIndex + 1;
+	endwhile;
+	
+	if (FATIndex == 64)						// If file not found 
+		[physicalSP - 2] = -1;				// return errorcode
+		ireturn;
+	endif;	
+	
 endif;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

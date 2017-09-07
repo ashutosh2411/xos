@@ -1,3 +1,5 @@
+// int=2 holds SysCalls 2 and 3
+
 alias physicalSP S0;				// Physical Address = Physical Page Number x 512 + offset.
 physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
 
