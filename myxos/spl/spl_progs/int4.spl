@@ -1,0 +1,75 @@
+// int=4 holds SysCalls 5
+
+alias physicalSP S0;					// Physical Address = Physical Page Number x 512 + offset.
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+
+alias sysCallNo S1;						// First argument from stack is system call number.
+sysCallNo = [physicalSP - 1];
+
+// returnvalue = [physicalSP - 2]		// [physicalSP - 2] is for return value to be saved in stack.
+
+alias currPCB S8;					// Formula for curr PCB
+currPCB = READY_LIST + 32 * ((PTBR - 1024) / 8);
+
+alias fileDescriptor S2;				// The Next argument is file name.
+fileDescriptor = [physicalSP - 4];		// There is just one argument for this system call.
+
+alias wordToWrite S3;					// The Next argument is file name.
+wordToWrite = [physicalSP - 3];			// There is just one argument for this system call.
+
+if (sysCallNo == 5) then
+
+	if (fileDescriptor > 7 || fileDescriptor < 0) then
+		[physicalSP-2] = -1;			// Invalid request by user
+		ireturn;						// return errorcode
+	endif;
+
+	if ([currPCB+15+fileDescriptor*2] == -1) then
+		[physicalSP-2] = -1;			// File descriptor not allotted
+		ireturn;						// return errorcode
+	endif;
+
+	alias filePointer S4;
+	filePointer = [currPCB+15+fileDescriptor*2];				// set filePointer
+	alias lSeek S5;	
+	lSeek = [currPCB+15+fileDescriptor*2+1];					// set lSeek
+
+	load (1, [FAT + [FILE_TABLE + filePointer*2]*8 + 2]);		// FATIndex = [FILE_TABLE + filePointer*2]
+	alias BBIndex S6;
+	BBIndex = lSeek / 512;
+
+	if([SCRATCHPAD + BBIndex] == -1) then
+		alias DFLIndex S7;
+		DFLIndex = 0;
+
+		while (DFLIndex < 447) do		
+			if ([FAT + 512 + DFLIndex] == 0) then		
+				break;							// search DFL for a free block
+			endif;				
+			DFLIndex = DFLIndex + 1;			
+		endwhile;
+		
+		if (DFLIndex == 447) then		
+			[physicalSP - 2] = -1;				// No free block
+			ireturn;							// return errorcode
+		endif;
+
+		[FAT + 512 + DFLIndex] = 1;			// Set DFL entry for the free to non free
+		[SCRATCHPAD + BBIndex] = DFLIndex;		// Set Basic Block Entry as FATIndex
+
+		store (1, [FAT + [FILE_TABLE + filePointer*2]*8 + 2]);			// Store Basic Block back.
+		[FAT + [FILE_TABLE + filePointer*2]*8 + 1] = [FAT + [FILE_TABLE + filePointer*2]*8 + 1] + 512;
+											// Increment size parameter FAT
+		store(5, 19);						// store the updated FAT to disk 			
+		store(6, 20);						// store the updated DFL to disk
+	endif;
+
+	load (1, [SCRATCHPAD + BBIndex]);				// Load block which contains LSEEK
+
+	[SCRATCHPAD + lSeek % 512] = wordToWrite;		// Write word
+	store (1, [SCRATCHPAD + BBIndex]);				// Store back
+
+	[currPCB + 15 + fileDescriptor * 2 + 1] = [currPCB + 15 + fileDescriptor * 2 + 1] + 1;
+	[physicalSP-2] = 0;								// Increment LSEEK
+	ireturn;										// return success
+endif;

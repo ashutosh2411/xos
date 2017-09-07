@@ -3,7 +3,6 @@
 alias physicalSP S0;				// Physical Address = Physical Page Number x 512 + offset.
 physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
 
-
 alias sysCallNo S1;					// First argument from stack is system call number.
 sysCallNo = [physicalSP - 1];
 
@@ -87,51 +86,64 @@ if (sysCallNo == 4) then				// sysCallNo = 4 => Delete file.
 	alias FATIndex S3;				// To index in FAT table.
 	FATIndex = 0;
 	
-	while (FATIndex < 64) do						// See if file is already present.
+	while (FATIndex < 64) do						// See if file is present.
 		if ([FAT + FATIndex*8] == filename) then	// Each entry is 8 words.
 			break;
 		endif;
-		FATIndex = FatIndex + 1;
+		FATIndex = FATIndex + 1;
 	endwhile;
 	
-	if (FATIndex == 64)						// If file not found 
+	if (FATIndex == 64)	then					// If file not found 
 		[physicalSP - 2] = -1;				// return errorcode
 		ireturn;
 	endif;	
+
+	alias SOFTIndex S4;
+	SOFTIndex = 0;
+
+	while (SOFTIndex < 64) do 				// Check if file present in SOFT
+		if ([FILE_TABLE + SOFTIndex*2] == FATIndex) then
+			break;							// If file found break
+		endif;
+
+		SOFTIndex = SOFTIndex+1;
+	endwhile;
+
+	if (SOFTIndex < 64 && [FILE_TABLE + SOFTIndex*2 + 1] > 0) then
+		[physicalSP-2] = -1;				// If no of instances is > 0
+		ireturn;							// return errorcode
+	endif;
+
+	[FAT + 512 + [FAT + FATIndex * 8 + 2]] = 0;		// Resetting DFL entry
+	load (1, [FAT + FATIndex * 8 + 2]);				// Basic Block
 	
+	alias nBlocks S5; 
+	nBlocks = 0;	
+	alias counter S6;
+	alias currBlock S7;
+
+	while (nBlocks < 256) do 
+		if ([SCRATCHPAD+nBlocks] < 0) then
+			break;
+		endif;
+
+		currBlock = [SCRATCHPAD+nBlocks];
+		[FAT + 512 + currBlock] = 0;
+		load (1, currBlock);
+		counter = 0;
+
+		while (counter < 512) do 
+			[SCRATCHPAD+counter] = "";
+		endwhile;
+		
+		store (1, currBlock);
+		load (1, [FAT + FATIndex * 8 + 2]);
+		nBlocks = nBlocks+1;
+	endwhile;
+
+	store(5, 19);						// store the updated FAT to disk 			
+	store(6, 20);						// store the updated DFL to disk
+	
+	[physicalSP-2] = 0;
+	ireturn;
 endif;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

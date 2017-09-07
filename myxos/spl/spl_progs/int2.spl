@@ -10,7 +10,7 @@ sysCallNo = [physicalSP - 1];
 // returnvalue = [physicalSP - 2]	// [physicalSP - 2] is for return value to be saved in stack.
 
 alias currPCB S6;					// Formula for curr PCB
-currPCB = READY_LIST = 32 * ((PTBR - 1024) / 8);
+currPCB = READY_LIST + 32 * ((PTBR - 1024) / 8);
 
 if (sysCallNo == 2) then 				// sysCallNo = 2 => Open file.
 	
@@ -105,14 +105,14 @@ if (sysCallNo == 3) then				// sysCallNo = 3 => Close file.
 
 	// decrease no of open files in SOFT by 1
 	// [currentPCB + 15 + fileDescriptor * 2] = SWOTIndex of requested file
-	[FILE_TABLE + [currentPCB + 15 + fileDescriptor * 2] * 2 + 1] = [FILE_TABLE + [currentPCB + 15 + fileDescriptor * 2] * 2 + 1] - 1;
+	[FILE_TABLE + [currPCB + 15 + fileDescriptor * 2] * 2 + 1] = [FILE_TABLE + [currPCB + 15 + fileDescriptor * 2] * 2 + 1] - 1;
 	
-	if ([FILE_TABLE+[currPCB+15+fileDescriptor*2]*2+1] = 0)					// If no of instances of open file is zero
-		[FILE_TABLE + [currentPCB + 15 + fileDescriptor * 2] * 2] = -1;		// invalidate SOFT entry
+	if ([FILE_TABLE+[currPCB+15+fileDescriptor*2]*2+1] == 0) then			// If no of instances of open file is zero
+		[FILE_TABLE + [currPCB + 15 + fileDescriptor * 2] * 2] = -1;		// invalidate SOFT entry
 	endif;
 
-	[currentPCB+15+fileDescriptor*2] = -1;			// Invalidate POFT entry
-	[currentPCB+15+fileDescriptor*2+1] = -1;		// and LSEEK value
+	[currPCB+15+fileDescriptor*2] = -1;			// Invalidate POFT entry
+	[currPCB+15+fileDescriptor*2+1] = -1;		// and LSEEK value
 
 	[physicalSP-2] = 0;					// return success
 	ireturn;

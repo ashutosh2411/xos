@@ -1,0 +1,79 @@
+// int=3 holds SysCalls 6 and 7
+
+alias physicalSP S0;					// Physical Address = Physical Page Number x 512 + offset.
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+
+alias currPCB S6;						// Formula for curr PCB.
+currPCB = READY_LIST + 32 * ((PTBR - 1024) / 8);
+
+alias sysCallNo S1;						// First argument from stack is system call number.
+sysCallNo = [physicalSP - 1];
+
+// returnvalue = [physicalSP - 2]		// [physicalSP - 2] is for return value to be saved in stack.
+
+alias fileDescriptor S2;				// The Next argument is fileDescriptor.
+fileDescriptor = [physicalSP - 4];
+
+if (sysCallNo == 6) then				// sysCallNo = 6 => LSEEK.
+
+	alias newLSeek S3;						// The Next argument is file name.
+	newLSeek = [physicalSP - 3];			// There is just one argument for this system call.
+
+	if (fileDescriptor > 7 || fileDescriptor < 0) then
+		[physicalSP-2] = -1;			// Invalid request by user.
+		ireturn;						// return errorcode.
+	endif;
+
+	if ([currPCB+15+fileDescriptor*2] == -1) then
+		[physicalSP-2] = -1;			// File descriptor not allotted
+		ireturn;						// return errorcode.
+	endif;
+
+	alias filePointer S4;
+	filePointer = [currPCB+15+fileDescriptor*2];			// set filePointer.
+	
+	alias fileSize S5;
+	fileSize = [FAT + [FILE_TABLE + filePointer*2]*8 + 1];
+
+	if (newLSeek < 0 || newLSeek > fileSize) then
+		[physicalSP-2] = -1;								// Invalid LSEEK 
+		ireturn;											// return errorcode.
+	endif;
+
+	[currPCB+15+fileDescriptor*2 + 1] = newLSeek;			// Set newLSeek.
+	[physicalSP-2] = 0;										// Return success.
+	ireturn;
+endif;
+
+if (sysCallNo == 7) then				// sysCallNo = 7 => File Read.
+
+	if (fileDescriptor > 7 || fileDescriptor < 0) then
+		[physicalSP-2] = -1;			// Invalid request by user.
+		ireturn;						// return errorcode.
+	endif;
+
+	if ([currPCB+15+fileDescriptor*2] == -1) then
+		[physicalSP-2] = -1;			// File descriptor not allotted
+		ireturn;						// return errorcode.
+	endif;
+
+	alias filePointer S4;
+	filePointer = [currPCB+15+fileDescriptor*2];				// set filePointer
+	alias lSeek S5;	
+	lSeek = [currPCB+15+fileDescriptor*2+1];					// set lSeek
+
+	load (1, [FAT + [FILE_TABLE + filePointer*2]*8 + 2]);		// FATIndex = [FILE_TABLE + filePointer*2]
+	
+	if (lSeek >= [FAT + [FILE_TABLE + filePointer*2]*8 + 1]) then
+		[physicalSP-2] = -1;
+	endif;
+
+	load (1, [FAT + [SCRATCHPAD + lSeek / 512]]);
+	[physicalSP - 3] = [SCRATCHPAD + (lSeek % 512)];
+
+	[currPCB+15+fileDescriptor*2+1] = [currPCB+15+fileDescriptor*2+1] + 1;
+
+	[physicalSP-2] = 0;
+	ireturn;	
+
+endif;
