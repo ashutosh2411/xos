@@ -10,7 +10,7 @@ sysCallNo = [physicalSP - 1];
 alias currPCB S6;					// Formula for curr PCB
 currPCB = READY_LIST = 32 * ((PTBR - 1024) / 8);
 
-if (sysCallNo == 2) then 
+if (sysCallNo == 2) then 				// sysCallNo = 2 => Open file.
 	
 	alias filename S2;					// The Next argument is file name.
 	filename = [physicalSP - 3];		// There is just one argument for this system call.
@@ -18,7 +18,7 @@ if (sysCallNo == 2) then
 	alias FATIndex S3;					// To index in FAT table.
 	FATIndex = 0;
 
-	while (FATIndex < 64) do			// See if file is already present.	
+	while (FATIndex < 64) do			// See if file is present.	
 		if ([FAT + FATIndex*8] == filename) then
 			break;
 		endif;
@@ -26,8 +26,8 @@ if (sysCallNo == 2) then
 		FATIndex = FATIndex + 1;
 	endwhile;
 
-	if (FATIndex == 64)	then
-		[physicalSP - 2] = -1;
+	if (FATIndex == 64)	then			// If file is absent
+		[physicalSP - 2] = -1;			// return errorcode
 		ireturn;
 	endif;								// FATIndex stores free FAT entry
 
@@ -41,8 +41,8 @@ if (sysCallNo == 2) then
 		SOFTIndex = SOFTIndex +1;		// SOFTIndex stores corresponding value
 	endwhile;
 
-	if (SOFTIndex>=64) then				// Look for a free slot
-		SOFTIndex = 0;
+	if (SOFTIndex>=64) then				// If not already in SOFT
+		SOFTIndex = 0;					// Look for a free slot
 
 		while(SOFTIndex < 64) do 		// Free Slot found
 			if([FILE_TABLE+SOFTIndex*2] == -1) then
@@ -52,34 +52,66 @@ if (sysCallNo == 2) then
 			SOFTIndex = SOFTIndex+1;
 		endwhile;
 		
-		if (SWOFTIndex >= 64) then		// no free slot found
+		if (SOFTIndex >= 64) then		// no free slot found
 			[physicalSP - 2] = -1;		// return errorcode
 			ireturn;
 		endif;
-		
-		[SWOFTIndex * 2 + 1] = 0;		// setting initial file count to 0
+
+		// [SOFTIndex * 2] = FATIndex;	// We set this if we get an entry in POFT 
+		[SOFTIndex * 2 + 1] = 0;		// Initialize file count to 0
 	endif;
 
-	aliad POFTIndex S5;
+	alias POFTIndex S5;
 	POFTIndex = 0;
 
-	while (POFTIndex < 8) do 
+	while (POFTIndex < 8) do 			// find free slot in Per Process OFT
 		if ([currPCB + 15 + POFTIndex * 2] == -1) then
-			break;
+			break;						// stored in PFOTIndex
 		endif;
 
 		POFTIndex = POFTIndex + 1;
 	endwhile;
 
-	if(POFTIndex==8) then
-		[physicalSP-2] = -1;
-		ireturn;
+	if(POFTIndex==8) then				// One process cannot have more than 
+		[physicalSP-2] = -1;			// eight open files
+		ireturn;						// return errorcode
 	endif;
 
+	[SOFTIndex * 2] = FATIndex;						// We set this if we get an entry in POFT 
+	[SOFTIndex*2+1] = [SOFTIndex*2+1] + 1;			// setting file count to count + 1
+
 	[currPCB+15+POFTIndex*2]   = SOFTIndex;
-	[currPCB+15+POFTIndex*2+1] = 0;
-	[physicalSP-2] = POFTIndex;
+	[currPCB+15+POFTIndex*2+1] = 0;		// Save LSEEK position to 0
+	[physicalSP-2] = POFTIndex;			// Return POFTIndex
 	ireturn;
 endif;
 
+if (sysCallNo == 3) then				// sysCallNo = 3 => Close file.
+	
+	alias fileDescriptor S2;
+	fileDescriptor = [physicalSP-3];	// Next argument is fileDescriptor
 
+	if (fileDescriptor > 7 || fileDescriptor < 0) then
+		[physicalSP-2] = -1;			// Invalid request by user
+		ireturn;						// return errorcode
+	endif;
+
+	if ([currPCB+15+fileDescriptor*2] == -1) then
+		[physicalSP-2] = -1;			// File descriptor not allotted
+		ireturn;						// return errorcode
+	endif;
+
+	// decrease no of open files in SOFT by 1
+	// [currentPCB + 15 + fileDescriptor * 2] = SWOTIndex of requested file
+	[FILE_TABLE + [currentPCB + 15 + fileDescriptor * 2] * 2 + 1] = [FILE_TABLE + [currentPCB + 15 + fileDescriptor * 2] * 2 + 1] - 1;
+	
+	if ([FILE_TABLE+[currPCB+15+fileDescriptor*2]*2+1] = 0)					// If no of instances of open file is zero
+		[FILE_TABLE + [currentPCB + 15 + fileDescriptor * 2] * 2] = -1;		// invalidate SOFT entry
+	endif;
+
+	[currentPCB+15+fileDescriptor*2] = -1;			// Invalidate POFT entry
+	[currentPCB+15+fileDescriptor*2+1] = -1;		// and LSEEK value
+
+	[physicalSP-2] = 0;					// return success
+	ireturn;
+endif;
