@@ -31,8 +31,8 @@ if (sysCallNo == 1) then			// sysCallNo = 1 => Create file.
 	while (DFLIndex < 448) do		// 447-512 are to be used for swapping. 
 									// Find a free slot in DFL. 
 		//print("Here");							// Each entry is 1 word
-		if ([FAT + 512 + DFLIndex] == 0) then	
-			break;					// FAT + 512 = address where DFL starts.
+		if ([DISK_LIST + DFLIndex] == 0) then	
+			break;					// DISK_LIST = address where DFL starts.
 		endif;				
 		DFLIndex = DFLIndex + 1;	
 	endwhile;
@@ -72,7 +72,7 @@ if (sysCallNo == 1) then			// sysCallNo = 1 => Create file.
 	endwhile;
 	
 	store(1, DFLIndex);					// Load from scratchpad back to actual basic block
-	[FAT + 512 + DFLIndex] = 1;			// location.
+	[DISK_LIST + DFLIndex] = 1;			// location.
 
 	store(5, 19);						// store the updated FAT to disk 			
 	store(6, 20);						// store the updated DFL to disk
@@ -83,13 +83,14 @@ if (sysCallNo == 1) then			// sysCallNo = 1 => Create file.
 endif;
 
 if (sysCallNo == 4) then				// sysCallNo = 4 => Delete file.
-	alias FATIndex S3;				// To index in FAT table.
+	alias FATIndex S3;					// To index in FAT table.
 	FATIndex = 0;
 	
 	while (FATIndex < 64) do						// See if file is present.
 		if ([FAT + FATIndex*8] == filename) then	// Each entry is 8 words.
 			break;
 		endif;
+		
 		FATIndex = FATIndex + 1;
 	endwhile;
 	
@@ -114,8 +115,8 @@ if (sysCallNo == 4) then				// sysCallNo = 4 => Delete file.
 		ireturn;							// return errorcode
 	endif;
 
-	[FAT + 512 + [FAT + FATIndex * 8 + 2]] = 0;		// Resetting DFL entry
 	load (1, [FAT + FATIndex * 8 + 2]);				// Basic Block
+	[FAT + FATIndex*8 + 1] = -1;
 	
 	alias nBlocks S5; 
 	nBlocks = 0;	
@@ -128,18 +129,23 @@ if (sysCallNo == 4) then				// sysCallNo = 4 => Delete file.
 		endif;
 
 		currBlock = [SCRATCHPAD+nBlocks];
-		[FAT + 512 + currBlock] = 0;
+		[DISK_LIST + currBlock] = 0;
 		load (1, currBlock);
 		counter = 0;
 
 		while (counter < 512) do 
 			[SCRATCHPAD+counter] = "";
+			counter = counter + 1;
 		endwhile;
 		
 		store (1, currBlock);
 		load (1, [FAT + FATIndex * 8 + 2]);
 		nBlocks = nBlocks+1;
 	endwhile;
+
+	[FAT + FATIndex * 8] = -1;			// Invalidate the entry in
+	[FAT + FATIndex * 8 + 1] = 0;		// FAT
+	[FAT + FATIndex * 8 + 2] = -1;
 
 	store(5, 19);						// store the updated FAT to disk 			
 	store(6, 20);						// store the updated DFL to disk

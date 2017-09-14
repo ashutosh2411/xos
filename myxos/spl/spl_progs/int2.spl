@@ -3,7 +3,6 @@
 alias physicalSP S0;				// Physical Address = Physical Page Number x 512 + offset.
 physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
 
-
 alias sysCallNo S1;					// First argument from stack is system call number.
 sysCallNo = [physicalSP - 1];
 
@@ -13,7 +12,6 @@ alias currPCB S6;					// Formula for curr PCB
 currPCB = READY_LIST + 32 * ((PTBR - 1024) / 8);
 
 if (sysCallNo == 2) then 				// sysCallNo = 2 => Open file.
-	
 	alias filename S2;					// The Next argument is file name.
 	filename = [physicalSP - 3];		// There is just one argument for this system call.
 
@@ -79,11 +77,12 @@ if (sysCallNo == 2) then 				// sysCallNo = 2 => Open file.
 		ireturn;						// return errorcode
 	endif;
 
-	[SOFTIndex * 2] = FATIndex;						// We set this if we get an entry in POFT 
-	[SOFTIndex*2+1] = [SOFTIndex*2+1] + 1;			// setting file count to count + 1
+	[FILE_TABLE + SOFTIndex * 2] = FATIndex;								// We set this if we get an entry in POFT 
+	[FILE_TABLE + SOFTIndex*2+1] = [FILE_TABLE + SOFTIndex*2 + 1] + 1;		// setting file count to count + 1
 
 	[currPCB+15+POFTIndex*2]   = SOFTIndex;
 	[currPCB+15+POFTIndex*2+1] = 0;		// Save LSEEK position to 0
+
 	[physicalSP-2] = POFTIndex;			// Return POFTIndex
 	ireturn;
 endif;
