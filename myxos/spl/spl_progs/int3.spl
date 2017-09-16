@@ -29,11 +29,11 @@ if (sysCallNo == 6) then				// sysCallNo = 6 => LSEEK.
 		ireturn;						// return errorcode.
 	endif;
 
-	alias filePointer S4;
-	filePointer = [currPCB+15+fileDescriptor*2];			// set filePointer.
+	alias SOFTIndex S4;
+	SOFTIndex = [currPCB+15+fileDescriptor*2];			// set SOFTIndex.
 	
 	alias fileSize S5;
-	fileSize = [FAT + [FILE_TABLE + filePointer*2]*8 + 1];
+	fileSize = [FAT + [FILE_TABLE + SOFTIndex*2]*8 + 1];
 
 	if (newLSeek < 0 || newLSeek > fileSize) then
 		[physicalSP-2] = -1;								// Invalid LSEEK 
@@ -46,7 +46,6 @@ if (sysCallNo == 6) then				// sysCallNo = 6 => LSEEK.
 endif;
 
 if (sysCallNo == 7) then				// sysCallNo = 7 => File Read.
-
 	if (fileDescriptor > 7 || fileDescriptor < 0) then
 		[physicalSP-2] = -1;			// Invalid request by user.
 		ireturn;						// return errorcode.
@@ -57,23 +56,25 @@ if (sysCallNo == 7) then				// sysCallNo = 7 => File Read.
 		ireturn;						// return errorcode.
 	endif;
 
-	alias filePointer S4;
-	filePointer = [currPCB+15+fileDescriptor*2];				// set filePointer
+	alias SOFTIndex S4;
+	SOFTIndex = [currPCB+15+fileDescriptor*2];				// set SOFTIndex
 	alias lSeek S5;	
 	lSeek = [currPCB+15+fileDescriptor*2+1];					// set lSeek
-
-	load (1, [FAT + [FILE_TABLE + filePointer*2]*8 + 2]);		// FATIndex = [FILE_TABLE + filePointer*2]
-	
-	if (lSeek >= [FAT + [FILE_TABLE + filePointer*2]*8 + 1]) then
-		[physicalSP-2] = -1;
+	breakpoint;
+	load (1, [FAT + [FILE_TABLE + SOFTIndex*2]*8 + 2]);		// FATIndex = [FILE_TABLE + SOFTIndex*2]
+	breakpoint;
+	if (lSeek == [FAT + [FILE_TABLE + SOFTIndex*2]*8 + 1]) then
+		[physicalSP-2] = -1;								// beyond file size
+		ireturn;
 	endif;
-
-	load (1, [FAT + [SCRATCHPAD + lSeek / 512]]);
+	breakpoint;
+	print ([[SCRATCHPAD + lSeek / 512]]);
+	load (1, [SCRATCHPAD + lSeek / 512]);			
 	[physicalSP - 3] = [SCRATCHPAD + (lSeek % 512)];
 
 	[currPCB+15+fileDescriptor*2+1] = [currPCB+15+fileDescriptor*2+1] + 1;
 
 	[physicalSP-2] = 0;
 	ireturn;	
-
+	breakpoint;
 endif;

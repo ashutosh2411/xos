@@ -1,9 +1,9 @@
 decl
 	integer option;
 	integer result;
-        integer new;
+	integer new;
 	string fileName;
-        string word;
+	string word;
 	integer FILE;
 	integer OpenCount;
 enddecl
@@ -13,9 +13,9 @@ integer main()
 	print("Enter option");
 	print("1. Create");
 	print("2. Open");
-    print("3. Write");
-    print("4. Read");
-    print("5. Seek");
+	print("3. Write");
+	print("4. Read");
+	print("5. Seek");
 	print("6. Close");
 	print("7. Delete");
 	print("8. Exit");
@@ -27,7 +27,7 @@ integer main()
 			if(OpenCount == 0) then
 				break;
 			endif;
-			print("Files Open!")
+			print("Files Open!");
 		endif;
 		
 		if(option == 1) then
@@ -54,17 +54,17 @@ integer main()
 				OpenCount = OpenCount - 1;
 			endif;
 		endif;
-                
-        if(option == 4) then
+				
+		if(option == 4) then
 			print("FileId? : ");
 			read(FILE);
 			result = Read(FILE,word);
 			print(result);
 			if(result == 0) then
-            	print(word);             
+				print(word);             
 			endif;
 		endif;
-            
+			
 		if(option == 7) then
 			print("Filename? : ");
 			read(fileName);	
@@ -73,8 +73,9 @@ integer main()
 		endif;
 
 		if(option == 3) then
-			
-                        print("word? : ");
+			print("FileId? : ");
+			read(FILE);
+			print("word? : ");
 			read(word);	
 			result = Write(FILE,word);
 			print(result);
