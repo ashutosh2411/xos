@@ -1,0 +1,105 @@
+// int=5 holds SysCall 8
+
+alias physicalSP S0;					// Physical Address = Physical Page Number x 512 + offset.
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+
+alias sysCallNo S1;						// First argument from stack is system call number.
+sysCallNo = [physicalSP - 1];
+
+alias currPID S2;
+currPID = (PTBR - 1024) / 8;
+
+if (sysCallNo == 8) then				// sysCallNo = 8 => Fork
+	alias RLIndex S2;
+	RLIndex = 0;
+
+	while (RLIndex < 32) do 			// Search for a free slot in Ready List.
+		if ([READY_LIST + 32*RLIndex + 1] == 0) then
+			break;
+		endif;
+		RLIndex = RLIndex + 1;
+	endwhile;		
+	if (RLIndex == 32) then 			// If beyond 32
+		[physicalSP-2] = -1;			// return error message.
+	endif;
+	
+	alias childPTBR S3; 
+	childPTBR = 1024 + RLIndex * 8;		// Child process's PTBR
+
+	alias MLIndex S4;
+	MLIndex = 25;
+	alias PTIndex S5;
+	PTIndex = 0;
+	alias counter S6;
+	counter = 0;
+
+	while (MLIndex < 64 && PTIndex < 4) do 
+		while([PTBR + PTIndex] < 0) do 						// copy invalid entries 
+			[PAGE_TABLE + 8*RLIndex + 2*PTIndex] = -1;		// of parent page table
+			[PAGE_TABLE + 8*RLIndex + 2*PTIndex + 1] = "00";// while looking for a 
+			PTIndex = PTIndex + 1;							// used entry. 
+			[SCRATCHPAD + PTIndex] = -1;					// Temporarily save Page table in 
+		endwhile;											// Scratchpad.
+
+		while (MLIndex < 64) do 							// look for a corresponding 
+			if ([MEM_LIST + MLIndex] == 0) then				// free memory block
+				[MEM_LIST + MLIndex] == 1;					// Map PT to new found block
+				[PAGE_TABLE + 8*RLIndex + 2*PTIndex] = MLIndex;		// Physical block no.
+				[PAGE_TABLE + 8*RLIndex + 2*PTIndex + 1] = "01";	// and other PT entries
+				
+				while (counter < 512) do 					// Copy parent to child
+					[MLIndex*512 + counter] = [512*[PTBR + PTIndex*2] + counter];
+					counter = counter + 1;
+				endwhile;
+				
+				[SCRATCHPAD + PTIndex] = MLIndex;			// Temporarily save block number 
+				break;										// Scratchpad. 
+			endif;
+			MLIndex = MLIndex + 1;			// Iteration variables
+		endwhile;
+		PTIndex = PTIndex + 1;				//    "			"
+	endwhile;
+	
+	if (PTIndex != 4) then							// If all pages of the Process are not alloted
+		while (PTIndex >=0) do 						// reset memory block free values
+			while ([SCRATCHPAD + PTIndex] < 0) do 	// and return -1
+				PTIndex = PTIndex - 1;
+			endwhile;
+			[MEM_LIST + [SCRATCHPAD + PTIndex]] == 0;
+		endwhile;
+		[physicalSP-2] = -1;
+		ireturn;
+	endif;
+
+	[READY_LIST + 32*RLIndex + 0] = RLIndex;		// PID 		
+	// [READY_LIST + 32*RLIndex + 1] = 1						// State	
+	[READY_LIST + 32*RLIndex + 2] = BP;				// BP		
+	[READY_LIST + 32*RLIndex + 3] = SP-1;						// SP
+	[READY_LIST + 32*RLIndex + 4] = [physicalSP];				// IP
+	[READY_LIST + 32*RLIndex + 5] = PAGE_TABLE + 8*RLIndex; 	// New Page Table Base
+	[READY_LIST + 32*RLIndex + 6] = 4;				// Length
+	[READY_LIST + 32*RLIndex + 7] = R0;				// General Registers
+	[READY_LIST + 32*RLIndex + 8] = R1;				// 	  "			"
+	[READY_LIST + 32*RLIndex + 9] = R2;				// 	  "			"
+	[READY_LIST + 32*RLIndex + 10] = R3;			// 	  "			"
+	[READY_LIST + 32*RLIndex + 11] = R4;			// 	  "			"
+	[READY_LIST + 32*RLIndex + 12] = R5;			// 	  "			"
+	[READY_LIST + 32*RLIndex + 13] = R6;			// 	  "			"
+	[READY_LIST + 32*RLIndex + 14] = R7;			// 	  "			"
+
+	counter = 0;
+	while (counter < 8) do 							// Copying Per process file table.
+		[READY_LIST + 32*RLIndex + 15 + 2*counter] = [READY_LIST + 32*currPID + 15 + 2*counter];
+		[FILE_TABLE + [READY_LIST + 32*RLIndex + 15 + 2*counter] + 1] = [FILE_TABLE + [READY_LIST + 32*RLIndex + 15 + 2*counter] + 1] + 1;
+		[READY_LIST + 32*RLIndex + 15 + 2*counter + 1] = [READY_LIST + 32*currPID + 15 + 2*counter + 1];
+		counter = counter + 1;						// and increment open file counts by 1
+	endwhile;
+
+	[READY_LIST + 32*RLIndex + 1] = 1				// set State to ready
+	[physicalSP-2] = RLIndex						// For parent return child's PID
+
+	alias childPhysicalSP S0;						// For child, 
+	childPhysicalSP = [PAGE_TABLE + 8*RLIndex + 6]*512 + SP-1;		// find PhySP of child
+	[childPhysicalSP-1] = -2;						// return -2.
+	ireturn;										// Note that it's -1 and not -2 bcz IP has not been pushed in the stack. 
+endif;

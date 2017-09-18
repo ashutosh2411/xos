@@ -2,10 +2,10 @@
 load (5, 19);			// Load File Allocation Table
 load (6, 20);			// Load Disk Free List
 
-load (7, 1); 			// Load exception handler
-load (8, 2);
+load (7,  1); 			// Load exception handler
+load (8,  2);
 
-load (9, 3);			//Load timer handler
+load (9,  3);			//Load timer handler
 load (10, 4);
 
 load (11, 5);			// Load Interrupt routine 1
@@ -14,7 +14,7 @@ load (12, 6);
 load (13, 7);			// Load Interrupt routine 2
 load (14, 8);
 
-load (15, 9);			// Load Interrupt routine 3
+load (15,  9);			// Load Interrupt routine 3
 load (16, 10);
 
 load (17, 11);			// Load Interrupt routine 4
@@ -31,9 +31,9 @@ load (24, 18);
 
 [READY_LIST + 0] = 0; 		// Sets the entry for PID as 0 
 
-load(25,21); 			// Load pages of code from disk to memory
-load(26,22); 
-load(27,23); 
+load (25,21); 			// Load pages of code from disk to memory
+load (26,22); 
+load (27,23); 
 
 PTBR = 1024; 			// PTBR = 1024 + (PID x 8) 
 PTLR = 4;			// Limit for every process 4
@@ -47,15 +47,6 @@ PTLR = 4;			// Limit for every process 4
 [PTBR + 6] = 28; 	// 		"			 3
 [PTBR + 7] = "01"; 	// 		"
 
-[READY_LIST + 1] = 2;		// Sets the entry for STATE as Running 
-SP = 3 * 512; 			
-[28 * 512] = 0; 		// Set up the IP value for INIT in the stack 
-				// on ireturn, IP is popped from SP 
-
-/////////////////////////////////////////////////////////////////////////////////
-//			Implementing Open file
-///////////////////////////////////////////////////////////////////////////////////
-
 //	set the entries of the System-Wide Open File Table to invalid	
 alias counter S0;			
 counter = 0;
@@ -65,7 +56,6 @@ while ( counter <  128) do					// 64 entries, each of size 2 words
 	counter = counter + 2;					// Move to next entry
 endwhile;
 
-
 // set the per-process open file table entries of the INIT process to invalid
 counter = 0;
 while (counter < 16) do
@@ -74,4 +64,26 @@ while (counter < 16) do
 	counter = counter + 2;					
 endwhile;
 
+// Setting memory free list
+counter = 0;
+while (counter < 29) do 
+	[MEM_LIST + counter] = 1;
+	counter = counter + 1;
+endwhile;
+while (counter < 64) do 
+	[MEM_LIST + counter] = 0;
+	counter = counter + 1;
+endwhile;
+
+// Initializing the PCBs in Ready List
+counter = 0;
+while (counter < 32) do 
+	[READY_LIST + counter*32 + 1] = 0;
+	counter = counter + 1;
+endwhile;
+
+[READY_LIST + 1] = 2;		// Sets the entry for STATE as Running 
+SP = 3 * 512; 			
+[28 * 512] = 0; 		// Set up the IP value for INIT in the stack 
+						// on ireturn, IP is popped from SP 
 ireturn;
