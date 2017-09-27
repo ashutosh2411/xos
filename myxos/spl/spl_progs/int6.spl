@@ -28,13 +28,13 @@ if (sysCallNo == 9) then				// sysCallNo = 8 => Exec
 	alias BBIndex S4;
 	BBIndex = 0;
 
-	while (BBIndex < 256) do 		// count number of valid pages. 
+	while (BBIndex < 256) do 			// count number of valid pages. 
 		if ([SCRATCHPAD + BBIndex] < 0) then
 			break;
 		endif;
 		BBIndex = BBIndex + 1;
 	endwhile;
-	if (BBIndex >= 3) then			// file too big. 
+	if (BBIndex >= 3) then				// file too big. 
 		[physicalSP-2] = -1;
 		ireturn;
 	endif;
