@@ -6,7 +6,7 @@ physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
 alias sysCallNo S1;						// First argument from stack is system call number.
 sysCallNo = [physicalSP - 1];
 
-if (sysCallNo == 10) then
+if (sysCallNo == 10) then				// sysCallNo =  => Exit
 	alias nextPID S2;
 	nextPID = 0;
 
@@ -24,5 +24,55 @@ if (sysCallNo == 10) then
 	alias currPCB S2;
 	currPCB = READY_LIST + (PTBR-1024)*4;
 
-	alias counter 
+	alias counter S3;
+
+	counter = 0;
+	while (counter < 8) do 
+		if ([currPCB + 15 + counter*2] != -1) then
+			[[currPCB+15+counter*2]*2+1] = [FILE_TABLE + [currPCB+15+counter*2]*2+1]-1
+		endif;
+		[currPCB+15+counter*2] =  -1;
+		[currPCB+15+counter*2+1] = -1;
+		endif;
+		counter = counter+1;
+	endwhile;
+	[currPCB+1] = 0;
+
+	counter = 0;
+	while(counter<4)do 
+		if ([PTBR + counter*2] == -1) then
+			counter = counter + 1;
+			continue;
+		endif;
+		[MEM_LIST + [PTBR + counter*2]] = 0;
+		[PTBR+counter*2] = -1;
+		[PTBR+counter*2+1] = "00";
+		counter = counter + 1;
+	endwhile;
+	alias newPCB S5;
+	newPCB = READY_LIST + nextPID*32;
+
+	BP = [newPCB + 2];
+	SP = [newPCB + 3];	
+		
+	// set PTBR and PTLR
+	PTBR = [newPCB + 5];
+	PTLR = [newPCB + 6];
+		
+	// set the value of registers R0 - R7
+	R0 = [newPCB + 7];
+	R1 = [newPCB + 8];
+	R2 = [newPCB + 9];
+	R3 = [newPCB + 10];
+	R4 = [newPCB + 11];
+	R5 = [newPCB + 12];
+	R6 = [newPCB + 13];
+	R7 = [newPCB + 14];
+
+	SP = SP + 1;
+	alias newPhysicalSP S6;
+	newPhysicalSP = [PTBR + 2*(SP/512)]*512 + SP % 512;
+	[newPhysicalSP] = [newPCB + 4];
+	[newPCB + 1] = 2;
+	ireturn;
 endif;
