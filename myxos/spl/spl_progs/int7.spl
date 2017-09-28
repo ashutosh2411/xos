@@ -54,12 +54,10 @@ if (sysCallNo == 10) then				// sysCallNo =  => Exit
 
 	BP = [newPCB + 2];
 	SP = [newPCB + 3];	
-		
-	// set PTBR and PTLR
+
 	PTBR = [newPCB + 5];
 	PTLR = [newPCB + 6];
 		
-	// set the value of registers R0 - R7
 	R0 = [newPCB + 7];
 	R1 = [newPCB + 8];
 	R2 = [newPCB + 9];
