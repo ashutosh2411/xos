@@ -43,7 +43,7 @@ if (sysCallNo == 8) then				// sysCallNo = 8 => Fork
 
 		while (MLIndex < 64) do 							// look for a corresponding 
 			if ([MEM_LIST + MLIndex] == 0) then				// free memory block
-				[MEM_LIST + MLIndex] == 1;					// Map PT to new found block
+				[MEM_LIST + MLIndex] = 1;					// Map PT to new found block
 				[PAGE_TABLE + 8*RLIndex + 2*PTIndex] = MLIndex;		// Physical block no.
 				[PAGE_TABLE + 8*RLIndex + 2*PTIndex + 1] = "01";	// and other PT entries
 				
@@ -65,7 +65,7 @@ if (sysCallNo == 8) then				// sysCallNo = 8 => Fork
 			while ([SCRATCHPAD + PTIndex] < 0) do 	// and return -1
 				PTIndex = PTIndex - 1;
 			endwhile;
-			[MEM_LIST + [SCRATCHPAD + PTIndex]] == 0;
+			[MEM_LIST + [SCRATCHPAD + PTIndex]] = 0;
 		endwhile;
 		[physicalSP-2] = -1;
 		ireturn;
@@ -95,8 +95,8 @@ if (sysCallNo == 8) then				// sysCallNo = 8 => Fork
 		counter = counter + 1;						// and increment open file counts by 1
 	endwhile;
 
-	[READY_LIST + 32*RLIndex + 1] = 1				// set State to ready
-	[physicalSP-2] = RLIndex						// For parent return child's PID
+	[READY_LIST + 32*RLIndex + 1] = 1;				// set State to ready
+	[physicalSP-2] = RLIndex;						// For parent return child's PID
 
 	alias childPhysicalSP S0;						// For child, 
 	childPhysicalSP = [PAGE_TABLE + 8*RLIndex + 6]*512 + SP-1;		// find PhySP of child

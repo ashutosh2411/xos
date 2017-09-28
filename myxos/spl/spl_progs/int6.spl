@@ -6,14 +6,17 @@ physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
 alias sysCallNo S1;						// First argument from stack is system call number.
 sysCallNo = [physicalSP - 1];
 
-alias filename S2;
-filename = [physicalSP-3];
+alias currPCB S6;
+currPCB = READY_LIST + (PTBR - 1024)*4;
+	
+if (sysCallNo == 9) then				// sysCallNo = 9 => Exec
+	alias filename S2;
+	filename = [physicalSP-3];
 
-if (sysCallNo == 9) then				// sysCallNo = 8 => Exec
 	alias FATIndex S3;
 	FATIndex = 0;
 
-	while (l < 64) do 					// search for file in FAT. 
+	while (FATIndex < 64) do 					// search for file in FAT. 
 		if ([FAT + FATIndex*8] == filename) then
 			break;
 		endif;
@@ -50,15 +53,16 @@ if (sysCallNo == 9) then				// sysCallNo = 8 => Exec
 		[PTBR + 2*PTIndex + 1] = "00";
 		PTIndex = PTIndex - 1;
 	endwhile;
+	alias counter S1;
 	while (PTIndex < BBIndex) do 							// else if less, 
-		alias counter S1;
+		
 		counter = 0;
 		while (counter < 64) do 							// find new free ones
 			if ([MEM_LIST + counter] == 0) then
-				[MEM_LIST + counter] == 1;					// and allocate to page table
+				[MEM_LIST + counter] = 1;					// and allocate to page table
 				[PTBR + 2*PTIndex] = counter;				
 				[PTBR + 2*PTIndex + 1] = "01";
-				PTIndex = PTIndex + 1;
+				PTIndex = PTIndex - 1;
 				break;
 			endif;
 			counter = counter + 1;
@@ -70,6 +74,7 @@ if (sysCallNo == 9) then				// sysCallNo = 8 => Exec
 	endwhile;
 
 	BBIndex = 0;
+	//alias counter 
 	counter = 0;
 	while ([SCRATCHPAD + BBIndex] > 0 && BBIndex < 256) do							// search in basic block 
 		if([SCRATCHPAD + BBIndex] > 23 && [SCRATCHPAD + BBIndex] < 448) then		// for valid code blocks
@@ -78,6 +83,7 @@ if (sysCallNo == 9) then				// sysCallNo = 8 => Exec
 					load([PTBR + 2*counter + 1], [SCRATCHPAD + BBIndex]);
 					[PTBR + 2*counter + 1] = "01";			// and load the code blocks 
 					counter = counter + 1;					// from memory appropriately.
+					BBIndex = BBIndex + 1;
 					break;
 				endif;
 				counter = counter + 1;
@@ -87,8 +93,8 @@ if (sysCallNo == 9) then				// sysCallNo = 8 => Exec
 	endwhile;
 
 	[PTBR + 7] = "01";										// set stack as not referenced.
-	alias currPCB S6;
-	currPCB = READY_LIST + (PTBR - 1024)*4;
+	//alias currPCB S6;
+	//currPCB = READY_LIST + (PTBR - 1024)*4;
 	counter = 0;
 	while(counter < 8) do 
 		if([currPCB + 15 + 2*counter] != -1) then			// close all files opened by current process
@@ -97,7 +103,7 @@ if (sysCallNo == 9) then				// sysCallNo = 8 => Exec
 				[FILE_TABLE + [currPCB + 15 + 2*counter]] = -1;
 			endif;
 			[currPCB+15+2*counter] = -1;
-			[currPCB=15+2*counter+1] = 0;					// similar to what we've done in 
+			[currPCB+15+2*counter+1] = 0;					// similar to what we've done in 
 		endif;												// file closing
 		counter = counter + 1;
 	endwhile;
@@ -105,8 +111,18 @@ if (sysCallNo == 9) then				// sysCallNo = 8 => Exec
 	SP = 3*512;
 	alias newPhysicalSP S7;
 
-	newPhysicalSP = ([PTBR+6]);								// new physical sp is reset to base
+	newPhysicalSP = ([PTBR+6]*512);								// new physical sp is reset to base
 
 	[newPhysicalSP] = 0;									// pust IP in stack's top
+	ireturn;
+endif;
+
+if (sysCallNo == 11) then						// sysCallNo = 11 => get current PID
+	[physicalSP-2] = (PTBR - 1024)/8;
+	ireturn;
+endif;
+
+if (sysCallNo == 12) then					// sysCallNo = 12 => get parent PID
+	[physicalSP-2] = [currPCB+31];
 	ireturn;
 endif;

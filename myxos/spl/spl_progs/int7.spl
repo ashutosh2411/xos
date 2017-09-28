@@ -7,7 +7,7 @@ alias sysCallNo S1;						// First argument from stack is system call number.
 sysCallNo = [physicalSP - 1];
 
 if (sysCallNo == 10) then				// sysCallNo =  => Exit
-	alias nextPID S2;
+	alias nextPID S9;
 	nextPID = 0;
 
 	while (nextPID < 32) do 
@@ -29,10 +29,9 @@ if (sysCallNo == 10) then				// sysCallNo =  => Exit
 	counter = 0;
 	while (counter < 8) do 
 		if ([currPCB + 15 + counter*2] != -1) then
-			[[currPCB+15+counter*2]*2+1] = [FILE_TABLE + [currPCB+15+counter*2]*2+1]-1
-		endif;
-		[currPCB+15+counter*2] =  -1;
-		[currPCB+15+counter*2+1] = -1;
+			[[currPCB+15+counter*2]*2+1] = [FILE_TABLE + [currPCB+15+counter*2]*2+1]-1;
+			[currPCB+15+counter*2] =  -1;
+			[currPCB+15+counter*2+1] = -1;
 		endif;
 		counter = counter+1;
 	endwhile;
@@ -74,3 +73,5 @@ if (sysCallNo == 10) then				// sysCallNo =  => Exit
 	[newPCB + 1] = 2;
 	ireturn;
 endif;
+
+
