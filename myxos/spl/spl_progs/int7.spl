@@ -1,6 +1,6 @@
 // int=7 holds SysCall 10
 alias physicalSP S0;					// Physical SP
-physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+physicalSP = ([PTBR + 2*(SP / 512)]*512) + (SP % 512);
 
 alias sysCallNo S1;						// SysCallNumber
 sysCallNo = [physicalSP - 1];
@@ -12,204 +12,130 @@ alias PID S8;
 PID = (PTBR - 1024) / 8;
 
 alias currentPCB S3;
-currentPCB = READY_LIST + PID * 32;
+currentPCB = READY_LIST + PID*32;
 
-if (sysCallNo == 10 || sysCallNo == 14) then
-	
-	// Exit() and Signal() needs to signal other processes to wake up
+// sysCallNo = 13 => Wait
+// sysCallNo = 14 => Signal
+
+if (sysCallNo == 10) then								// sysCallNo = 10 => Exit
+
 	counter = 0;
-	while (counter < 32) do
-		if ([READY_LIST + 32 * counter + 1] == 100 + PID) then
-			[READY_LIST + 32 * counter + 1] = 1;	// set process state to ready
+	while (counter < 32) do 							// unblock waiting processes
+		if ([READY_LIST + 32*counter + 1] == 100 + PID) then
+			[READY_LIST + 32*counter + 1] = 1;		// set process state to ready
 		endif;
 		counter = counter + 1;	
 	endwhile;
-	
-	if (sysCallNo == 14) then
-		// this is all that Signal() needs to do
-		// so just return
-		[physicalSP - 2] = 0;
-		ireturn;
-	endif;
-	
-endif;
 
-if (sysCallNo == 10 || sysCallNo == 13) then
-	
-	// common code to reduce code duplication
-	
-	// search for any ready process in ready list
-	
 	nextPID = 0;
-	while (nextPID < 32) do
-		if ([READY_LIST + 32 * nextPID + 1] == 1) then
+	while (nextPID < 32) do 							// Search for next ready process
+		if ([READY_LIST + 32*nextPID + 1] == 1) then
 			break;
 		endif;
 		nextPID = nextPID + 1;
 	endwhile;	
 	
-endif;
-
-if (sysCallNo == 10) then
-
-	// implementation of Exit()
-	
-	if (nextPID == 32) then
-		// no more processes in ready list
-		// simply halt
-		halt;
+	if (nextPID == 32) then								// No ready processes
+		halt;											// halt
 	endif;
-	
-	// we have a process to be executed
-	
-	// close all open instances of files by current process
-		
+			
 	counter = 0;
 	while (counter < 8) do
-		if ([currentPCB + 15 + counter * 2] != -1) then				
-			// we have a valid index to SWOFT
-			// index into it and decrement file count
-			[FILE_TABLE + [currentPCB + 15 + counter * 2] * 2 + 1] = [FILE_TABLE + [currentPCB + 15 + counter * 2] * 2 + 1] - 1;
-			if ([FILE_TABLE + [currentPCB + 15 + counter * 2] * 2 + 1] == 0) then				
-				// there are no more references to the file
-				// invalidate the entry in SWOFT					
-				[FILE_TABLE + [currentPCB + 15 + counter * 2] * 2] = -1;
+		if ([currentPCB + 15 + counter*2] != -1) then			// handle open files. remove counts in SOFT and free the position if no open instance. 
+			[FILE_TABLE + [currentPCB + 15 + counter*2]*2 + 1] = [FILE_TABLE + [currentPCB + 15 + counter*2]*2 + 1] - 1;
+			if ([FILE_TABLE + [currentPCB + 15 + counter*2]*2 + 1] == 0) then
+				[FILE_TABLE + [currentPCB + 15 + counter*2]*2] = -1;
 			endif;
-			// invalidate the PPOFT by setting fields to -1
-			[currentPCB + 15 + counter * 2] = -1;
-			[currentPCB + 15 + counter * 2 + 1] = -1;	
+			[currentPCB + 15 + counter*2] = -1;					// invalidate POFT
+			[currentPCB + 15 + counter*2 + 1] = -1;
 		endif;
 		counter = counter + 1;
 	endwhile;
 	
-	// set state as terminated
-	[currentPCB + 1] = 0;
-	
-	// free the entries of the page table
-	counter = 0;
+	[currentPCB + 1] = 0;										// set state as terminated
+
+	counter = 0;												// free alloted pages.	
 	while (counter < 4) do
-		if ([PTBR + counter * 2] == -1) then
-			// already invalid
+		if ([PTBR + counter*2] == -1) then						// skip invalid entries in Page table
 			counter = counter + 1;
 			continue;
 		endif;
-		// valid page table
-		// set memory location as free in memory list
-		[MEM_LIST + [PTBR + counter * 2]] = 0;
-		// invalidate entries in PTBR
-		[PTBR + counter * 2] = -1;
-		// set auxiliary info to not valid
-		[PTBR + counter * 2 + 1] = "00";
+
+		[MEM_LIST + [PTBR + counter*2]] = 0;					// otherwise set memory indices to free
+		[PTBR + counter*2] = -1;								// and invalidate PT entries
+		[PTBR + counter*2 + 1] = "00";							// and auxiliary information
 		counter = counter + 1;
 	endwhile;	
-
 endif;
 
 if (sysCallNo == 13) then
-	
-	// implementation of Wait() system call
-	
-	// get the PID of the process to be waited for
+	nextPID = 0;
+	while (nextPID < 32) do 									// Get next ready process
+		if ([READY_LIST + 32*nextPID + 1] == 1) then
+			break;
+		endif;
+		nextPID = nextPID + 1;
+	endwhile;
 	alias waitingPID S7;
 	waitingPID = [physicalSP - 3];
 	
-	// check if the process we're waiting for is running or terminated
-	if ([READY_LIST + 32 * waitingPID + 1] == 0 || [READY_LIST + 32 * waitingPID + 1] == 2) then
-		// error, process is waiting for itself
-		[physicalSP - 2] = -1;
-		ireturn;
+	if ([READY_LIST + 32*waitingPID + 1] == 0 || [READY_LIST + 32*waitingPID + 1] == 2) then
+		[physicalSP - 2] = -1;								// can't wait for an invalid process
+		ireturn;											// or a running process, i.e itself.
 	endif;
 	
-	// change the STATE field of the current process to 100 + waitingPID
-	[READY_LIST + PID * 32 + 1] = 100 + waitingPID;
-	
-	// Wait() needs to store the context of the current process
-
-	// store back the current registers to the PCB of the current process
-	// store BP and SP - 1
-	// SP - 1 because when an interrupt occurs, the value of IP is stored
-	// automatically on the top of the stack and SP is incremented
-	// hence SP - 1 is the correct value.
-
-	[currentPCB + 2] = BP;
-	[currentPCB + 3] = SP - 1;
-
-	// next we need to set the IP field
-	// when a timer occurs IP value gets stored in the stack
-	// the timer interrupt routine should fetch this value from the 
-	// stack and save it in the PCB of the current process
-	// you will have to convert from logical to physical address because
-	// once the interrupt is fired you're in the KERNEL mode
-
-	// IP of the current process is on top of the stack
-	// save this value
-	[currentPCB + 4] = [physicalSP];
-
-	// set PTBR and PTLR
-	[currentPCB + 5] = PTBR;
-	[currentPCB + 6] = PTLR;
-
-	// back up the value of registers R0-R7
-	[currentPCB + 7] = R0;
-	[currentPCB + 8] = R1;
-	[currentPCB + 9] = R2;
-	[currentPCB + 10] = R3;
-	[currentPCB + 11] = R4;
-	[currentPCB + 12] = R5;
-	[currentPCB + 13] = R6;
-	[currentPCB + 14] = R7;
-
-	// OK, saved state of current process
+	[currentPCB+ 1] = 100 + waitingPID;			// set state to 100 + waitingPID
+	[currentPCB + 2] = BP;						// BP
+	[currentPCB + 3] = SP - 1;					// SP top has IP value. so, SP - 1
+	[currentPCB + 4] = [physicalSP];			// IP
+	[currentPCB + 5] = PTBR;					// PTBR
+	[currentPCB + 6] = PTLR;					// PTLR
+	[currentPCB + 7] = R0;						// Registers
+	[currentPCB + 8] = R1;						//     "
+	[currentPCB + 9] = R2;						//     "
+	[currentPCB + 10] = R3;						//     "
+	[currentPCB + 11] = R4;						//     "
+	[currentPCB + 12] = R5;						//     "
+	[currentPCB + 13] = R6;						//     "
+	[currentPCB + 14] = R7;						//     "
 	
 endif;
 
 if (sysCallNo == 10 || sysCallNo == 13) then
 
-	// find and set up the next ready process
-	// required PID will be stored in nextPID
+	BP = [nextPID + 2];
+	SP = [nextPID + 3];	
+// Will be loaded from top of SP.
+	PTBR = [nextPID + 5];
+	PTLR = [nextPID + 6];		
+	R0 = [nextPID + 7];
+	R1 = [nextPID + 8];
+	R2 = [nextPID + 9];
+	R3 = [nextPID + 10];
+	R4 = [nextPID + 11];
+	R5 = [nextPID + 12];
+	R6 = [nextPID + 13];
+	R7 = [nextPID + 14];
 	
-	// we've already found out the next 'ready' process
-	// load its context as in timer.spl (copied)
-	
-	alias newPCB S5;
-	newPCB = READY_LIST + nextPID * 32;
-	
-	// set the values of SP and BP
-	BP = [newPCB + 2];
-	SP = [newPCB + 3];	
-		
-	// set PTBR and PTLR
-	PTBR = [newPCB + 5];
-	PTLR = [newPCB + 6];
-		
-	// set the value of registers R0 - R7
-	R0 = [newPCB + 7];
-	R1 = [newPCB + 8];
-	R2 = [newPCB + 9];
-	R3 = [newPCB + 10];
-	R4 = [newPCB + 11];
-	R5 = [newPCB + 12];
-	R6 = [newPCB + 13];
-	R7 = [newPCB + 14];
-		
-	// set the IP field		
-	// but you can't directly manipulate IP
-	// we need the execution to start from IP for which you have to put it on top
-	// of the stack of the new process
-	// think about it -- after an interrupt routine has finished execution, we
-	// pop off the IP value from the stack of the current process (the process that caused
-	// the exception) and then continue executing it
-	// here the two processes -- the one before and after the interrupt, are obviously different
-	// clever but complicated exploitation of the interrupt mechanism
-	
-	SP = SP + 1;
+	SP = SP + 1;							// old SP + 1 will have IP value
 	alias newPhysicalSP S6;
-	newPhysicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
-	[newPhysicalSP] = [newPCB + 4];
+	newPhysicalSP = ([PTBR + 2*(SP / 512)]*512) + (SP % 512);		// calculate new Physical SP 
+	[newPhysicalSP] = [nextPID + 4];		// load IP in that location
 	
-	// set the state field of the new process to running
-	[newPCB + 1] = 2;
+	[nextPID + 1] = 2;						// Set the state to running.
 	
 endif;
 
+if (sysCallNo == 14) then			// sysCallNo = 14 => Signal
+	counter = 0;
+	while (counter < 32) do
+		if ([READY_LIST + 32*counter + 1] == 100 + PID) then
+			[READY_LIST + 32*counter + 1] = 1;		// set blocked process state to ready
+		endif;
+		counter = counter + 1;	
+	endwhile;
+
+	[physicalSP - 2] = 0;								// return.
+	ireturn;	
+endif;
 ireturn;
