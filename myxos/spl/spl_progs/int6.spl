@@ -109,7 +109,7 @@ if (sysCallNo == 9) then				// sysCallNo = 9 => Exec
 	SP = 3*512;
 	alias newPhysicalSP S7;
 
-	newPhysicalSP = ([PTBR+2-*(SP/512)]*512) + (SP % 512);								// new physical sp is reset to base
+	newPhysicalSP = ([PTBR+2*(SP/512)]*512) + (SP % 512);								// new physical sp is reset to base
 
 	[newPhysicalSP] = 0;									// pust IP in stack's top
 	ireturn;

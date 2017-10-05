@@ -5,7 +5,7 @@ enddecl
 integer main()
 {
 	print("Enter command:");	
-	print("AashShell>");
+	print("Shell>");
 	read(command);
 	
 	while (command != "exit") do
@@ -27,7 +27,7 @@ integer main()
 			endif;
 		endif;		
 		
-		print("AashShell>");
+		print("Shell>");
 		read(command);
 		
 	endwhile;
