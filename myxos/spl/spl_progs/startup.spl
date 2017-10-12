@@ -66,7 +66,7 @@ endwhile;
 
 // Setting memory free list
 counter = 0;
-while (counter < 29) do 
+while (counter < 26) do 					// edit to 26
 	[MEM_LIST + counter] = 1;
 	counter = counter + 1;
 endwhile;
@@ -75,15 +75,32 @@ while (counter < 64) do
 	counter = counter + 1;
 endwhile;
 
+counter = 448;
+while (counter < 512) do 
+	[DISK_LIST + counter] = 0;
+	counter = counter + 1;
+endwhile;
+
+store(6, 20)				// save DFL back to memory
+
 // Initializing the PCBs in Ready List
+// 
+alias POFTIndex S1;
 counter = 0;
 while (counter < 32) do 
 	[READY_LIST + counter*32 + 1] = 0;
+	POFTIndex = 0;
+	while (POFTIndex < 8) do 
+		[READY_LIST + counter * 32 + 15 + POFTIndex * 2] = -1;
+		[READY_LIST + counter * 32 + 15 + POFTIndex * 2 + 1] = -1;
+		POFTIndex = POFTIndex + 1;
+	endwhile;
 	counter = counter + 1;
 endwhile;
 
 [READY_LIST + 1] = 2;		// Sets the entry for STATE as Running 
+[READY_LIST + 31] = 0;		// Set the parent of INIT as itself
 SP = 3 * 512; 			
-[28 * 512] = 0; 		// Set up the IP value for INIT in the stack 
+[25 * 512] = 0; 		// stack is now at number 25 
 						// on ireturn, IP is popped from SP 
 ireturn;
