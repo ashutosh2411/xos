@@ -1,119 +1,98 @@
-// int=6 holds SysCall 9
+// int=6 holds syscall 9, 11 nd 13
 
-alias physicalSP S0;					// Physical Address = Physical Page Number x 512 + offset.
-physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+alias physicalSP S0;						// Physical Address = Physical Page Number x 512 + offset.
+physicalSP = ([PTBR + 2*(SP / 512)]*512) + (SP % 512);
 
-alias sysCallNo S1;						// First argument from stack is system call number.
+alias sysCallNo S1;							// first argument is syscall number
 sysCallNo = [physicalSP - 1];
 
-alias currPCB S6;
-currPCB = READY_LIST + (PTBR - 1024)*4;
+alias fileName S2;
+fileName = [physicalSP - 3];	// note the three, not two
+
+alias PID S8;
+PID = (PTBR - 1024) / 8;
+
+alias currentPCB S9;
+currentPCB = READY_LIST + 32*PID;
+
+alias counter S3;
+
+if (sysCallNo == 9) then					// SysCallNo = 9 => Exec
 	
-if (sysCallNo == 9) then				// sysCallNo = 9 => Exec
-	alias filename S2;
-	filename = [physicalSP-3];
-
-	alias FATIndex S3;
+	alias FATIndex S4;						// check if file exists
 	FATIndex = 0;
-
-	while (FATIndex < 64) do 			// search for file in FAT. 
-		if ([FAT + FATIndex*8] == filename) then
-			break;
-		endif;
-		FATIndex = FATIndex + 1;
+	
+	while (FATIndex < 64) do				
+		if ([FAT + FATIndex*8] == fileName) then
+			break;			
+		endif;		
+		FATIndex = FATIndex + 1;	
 	endwhile;
-	if (FATIndex == 64) then			// if not found, 
-		[physicalSP-2] = -1;			// return errorcode
+	
+	if (FATIndex == 64) then	
+		[physicalSP - 2] = -1;				// file does not exist
+		ireturn;	
+	endif;	
+	
+	alias countCodeBlocksNew S5;					// count the number of code blocks of the new program
+	countCodeBlocksNew = [FAT + FATIndex*8 + 1];	// size
+	countCodeBlocksNew = countCodeBlocksNew / 512;	// size by 512 gives number of pages
+	
+	if (countCodeBlocksNew > 3) then
+		[physicalSP - 2] = -1;				// invalid file, program can have only three pages of code
 		ireturn;
 	endif;
-
-	load (1, [FAT + FATIndex*8 + 2]);
-	alias BBIndex S4;
-	BBIndex = 0;
-
-	while (BBIndex < 256) do 			// count number of valid pages. 
-		if ([SCRATCHPAD + BBIndex] < 0) then
-			break;
-		endif;
-		BBIndex = BBIndex + 1;
-	endwhile;
-	if (BBIndex > 3) then				// file too big. 
-		[physicalSP-2] = -1;
-		ireturn;
-	endif;
-
-	alias PTIndex S5;
-	PTIndex = 0;
-	while([PTBR + 2*PTIndex] >= 0 && PTIndex < 3) do 		// number of entried
-		PTIndex = PTIndex + 1;								// in Page table except the 4th one. 
-	endwhile;
-	while (PTIndex > BBIndex) do 							// If more than required blocks,
-		[MEM_LIST + [PTBR + 2*PTIndex]] = 0;				// unallocate the extras
-		[PTBR + 2*PTIndex] = -1;
-		[PTBR + 2*PTIndex + 1] = "00";
-		PTIndex = PTIndex - 1;
-	endwhile;
-	alias counter S1;
-	if (PTIndex < BBIndex) then 							// else if less, 
-		counter = 0;
-		alias newPageCount S8;
-		newPageCount = BBIndex - PTIndex;
-		while (counter < 64 && newPageCount > 0) do 							// find new free ones
-			if ([MEM_LIST + counter] == 0) then
-				newPageCount = newPageCount - 1;
-			endif;
-			counter = counter + 1;
-		endwhile;	
-		if (counter == 64) then								// If not enough memory, return error
-			[physicalSP-2] = -1;
-			ireturn;
-		endif;
-
-		counter = 0;
-		newPageCount = BBIndex - PTIndex;
-		while (counter < 64 && newPageCount > 0) do 
-			if ([MEM_LIST + counter] == 0) then
-				[MEM_LIST + counter] = 1;
-				[PTBR + (BBIndex - newPageCount)*2] = counter;
-				[PTBR + (BBIndex - newPageCount)*2 + 1] = "01";
-				newPageCount = newPageCount - 1;
-			endif;
-			counter = counter + 1;
-		endwhile;
-	endif;
-
-	BBIndex = 0;
-
-
-
-	//alias counter 
+	
 	counter = 0;
-	while (counter < BBIndex) do
-		load([PTBR + counter*2], [SCRATCHPAD + counter]);
+	while (counter < 3) do
+		if ([PTBR + counter*2 + 1] == "01" || [PTBR + counter*2 + 1] == "11") then		// decrement count in mem list
+			[MEM_LIST + [PTBR + counter*2]] = [MEM_LIST + [PTBR + counter*2]] - 1;
+		endif;
+		if ([PTBR + counter*2 + 1] == "00" && [PTBR + counter*2] > 447) then
+			[DISK_LIST + [PTBR + counter*2]] = [DISK_LIST + [PTBR + counter*2]] - 1;
+		endif;
+		counter = counter + 1;
+	endwhile;
+	
+	load(1, [FAT + FATIndex*8 + 2]);						// load basic block 
+	
+	counter = 0;
+	while (counter < countCodeBlocksNew) do 				// update the PTBR
+		[PTBR + counter*2] = [SCRATCHPAD + counter];
+		[PTBR + counter*2 + 1] = "00";
+		counter = counter + 1;
+	endwhile;
+	
+	while (counter < 3) do 								// invalidate remaining entries in PTBR
+		[PTBR + counter*2] = -1;
+		[PTBR + counter*2 + 1] = "00";
+		counter = counter + 1;
+	endwhile;
+	
+	[PTBR + 7] = "01";	
+		
+	counter = 0;
+	while (counter < 8) do 								// close all open files
+		if ([currentPCB + 15 + counter*2] != -1) then				
+			[FILE_TABLE + [currentPCB + 15 + counter*2]*2 + 1] = [FILE_TABLE + [currentPCB + 15 + counter*2]*2 + 1] - 1;
+			if ([FILE_TABLE + [currentPCB + 15 + counter*2]*2 + 1] == 0) then				
+				[FILE_TABLE + [currentPCB + 15 + counter*2]*2] = -1;
+			endif;
+			[currentPCB + 15 + counter*2] = -1;
+			[currentPCB + 15 + counter*2 + 1] = -1;	
+		endif;
 		counter = counter + 1;
 	endwhile;
 
-	counter = 0;
-	while(counter < 8) do 
-		if([currPCB + 15 + 2*counter] != -1) then			// close all files opened by current process
-			[FILE_TABLE + [currPCB + 15 + 2*counter]+1] = [FILE_TABLE + [currPCB + 15 + 2*counter]+1] - 1;
-			if([FILE_TABLE+[currPCB+15+2*counter]+1]==0) then 
-				[FILE_TABLE + [currPCB + 15 + 2*counter]] = -1;
-			endif;
-			[currPCB+15+2*counter] = -1;
-			[currPCB+15+2*counter+1] = 0;					// similar to what we've done in 
-		endif;												// file closing
-		counter = counter + 1;
-	endwhile;
-
-	SP = 3*512;
-	alias newPhysicalSP S7;
-
-	newPhysicalSP = ([PTBR+2*(SP/512)]*512) + (SP % 512);								// new physical sp is reset to base
-
-	[newPhysicalSP] = 0;									// pust IP in stack's top
+	SP = 3*512;							// reset sp
+		
+	physicalSP = ([PTBR + 2*(SP / 512)]*512) + (SP % 512);			// store IP on top
+	[physicalSP] = 0;
+	
 	ireturn;
+
 endif;
+
 
 if (sysCallNo == 11) then									// sysCallNo = 11 => get current PID
 	[physicalSP-2] = (PTBR - 1024)/8;
